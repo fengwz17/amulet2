@@ -57,6 +57,7 @@ static const char * USAGE =
 #include "parser.h"
 #include "substitution_engine.h"
 #include "polynomial_solver.h"
+#include "divider_verify.h"
 /*------------------------------------------------------------------------*/
 // / Name of the input file
 static const char * input_name = 0;
@@ -130,33 +131,70 @@ int main(int argc, char ** argv) {
       } else {
         die("mode has alreday been selected(try '-h')");
       }
-    } else if (!strcmp(argv[i], "-certify")) {
+    }
+    else if (!strcmp(argv[i], "-verify-divider"))
+    {
+      if (!mode)
+      {
+        msg("selected mode: divider verification");
+        mode = 4;
+      }
+      else
+      {
+        die("mode has alreday been selected(try '-h')");
+      }
+    }
+    else if (!strcmp(argv[i], "-certify"))
+    {
       if (!mode) {
         msg("selected mode: verification + certificates");
         mode = 3;
       } else {
         die("mode has alreday been selected(try '-h')");
       }
-    } else if (!strcmp(argv[i], "-p1")) {
+    }
+    else if (!strcmp(argv[i], "-p1"))
+    {
       if (proof) die("too many proof formats selected(try '-h')");
       proof = 1;
-    } else if (!strcmp(argv[i], "-p2")) {
+    }
+    else if (!strcmp(argv[i], "-p2"))
+    {
       if (proof) die("too many proof formats selected(try '-h')");
       proof = 2;
-    } else if (!strcmp(argv[i], "-p3")) {
+    }
+    else if (!strcmp(argv[i], "-p3"))
+    {
       if (proof) die("too many proof formats selected(try '-h')");
       proof = 3;
-    } else if (!strcmp(argv[i], "-signed")) {
+    }
+    else if (!strcmp(argv[i], "-signed"))
+    {
       signed_mult = 1;
-    } else if (!strcmp(argv[i], "-no-counter-examples")) {
+    }
+    else if (!strcmp(argv[i], "-no-counter-examples"))
+    {
       gen_witness = 0;
-    } else if (output_name3) {
+    }
+    else if (output_name3)
+    {
       die("too many arguments '%s', '%s', '%s', '%s' and '%s'(try '-h')",
         input_name, output_name1, output_name2, output_name3, argv[i]);
-    } else if (output_name2) { output_name3 = argv[i];
-    } else if (output_name1) { output_name2 = argv[i];
-    } else if (input_name) { output_name1 = argv[i];
-    } else {
+    }
+    else if (output_name2)
+    {
+      output_name3 = argv[i];
+    }
+    else if (output_name1)
+    {
+      output_name2 = argv[i];
+    }
+    else if (input_name)
+    {
+      output_name1 = argv[i];
+    }
+    else
+    {
       input_name = argv[i];
     }
   }
@@ -194,12 +232,23 @@ int main(int argc, char ** argv) {
 
   parse_aig(input_name);
 
-  if (mode == 1) {
-    init_gate_substitution();
-    substitution(output_name1, output_name2);
-  } else {
+  if (mode == 4)
+  {
     init_gates_verify();
-    verify(input_name, output_name1, output_name2, output_name3, mode == 3);
+    dividerVerify(input_name, output_name1, output_name2);
+  }
+  else
+  {
+    if (mode == 1)
+    {
+      init_gate_substitution();
+      substitution(output_name1, output_name2);
+    }
+    else
+    {
+      init_gates_verify();
+      verify(input_name, output_name1, output_name2, output_name3, mode == 3);
+    }
   }
 
   reset_aig_parsing();
