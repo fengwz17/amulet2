@@ -13,11 +13,13 @@ void dividerVerify(const char *inp_f = 0,
                    const char *out_f1 = 0,
                    const char *out_f2 = 0);
 
-void print_circuit_poly(FILE *file);
+void print_circuit_poly_divider(FILE *file);
 
 // defines the divider specification
 // \sum 2^i * ai = (\sum 2^i * bi) * (\sum 2^i * si) + \sum 2^i * si+NN/2
 Polynomial *print_spec_poly_divider(FILE *file);
+
+Polynomial *divide_by_lt(const Polynomial *p1, const Term *t);
 
 const Polynomial *reduce_divider(FILE *file);
 
