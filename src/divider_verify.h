@@ -2,6 +2,7 @@
 #define AMULET2_SRC_DIVIDER_VERIFY_H_
 /*------------------------------------------------------------------------*/
 #include "elimination.h"
+#include "parser.h"
 /*------------------------------------------------------------------------*/
 // / If final remainder is not equal to zero a counter example is generated and
 // / printed to file <input_name>.wit, default is true, can be turned of
@@ -19,8 +20,12 @@ void print_circuit_poly_divider(FILE *file);
 // \sum 2^i * ai = (\sum 2^i * bi) * (\sum 2^i * si) + \sum 2^i * si+NN/2
 Polynomial *print_spec_poly_divider(FILE *file);
 
-Polynomial *divide_by_lt(const Polynomial *p1, const Term *t);
+// if lt(p) / lt(pi) return negative quotien
+// else return 0
+Polynomial *divide_by_lt(const Polynomial *p, const Term *t);
 
 const Polynomial *reduce_divider(FILE *file);
+
+void fix_order();
 
 #endif // AMULET2_SRC_DIVIDER_VERIFY_H_

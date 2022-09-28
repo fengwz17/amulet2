@@ -41,5 +41,6 @@ void init_aiger_with_checks();
 */
 void parse_aig(const char * input_name);
 
+extern int divider_order;
 
 #endif  // AMULET2_SRC_PARSER_H_

@@ -8,6 +8,7 @@
 /*------------------------------------------------------------------------*/
 #include "parser.h"
 /*------------------------------------------------------------------------*/
+int divider_order = 0;
 
 bool match_and(unsigned lhs, unsigned rhs0, unsigned rhs1) {
   if (lhs == aiger_false) return 0;
@@ -24,16 +25,25 @@ bool match_and(unsigned lhs, unsigned rhs0, unsigned rhs1) {
 /*------------------------------------------------------------------------*/
 void determine_input_order() {
   unsigned s0 = 0, sl = NN-1;
-  if (match_and(
-        slit(0),
-        get_model_inputs_lit(0),
-        get_model_inputs_lit(1))) {
-    a0 = 0, al = NN-2, ainc = 2;
-    b0 = 1, bl = NN-1, binc = 2;
+  if (divider_order == 1)
+  {
+    b0 = NN / 2, bl = NN - 1, binc = 1;
+    a0 = 0, al = NN / 2 - 1, ainc = 1;
+    msg("assuming divider ordering as in boolector generated benchmarks");
+  }
+  else if (match_and(
+               slit(0),
+               get_model_inputs_lit(0),
+               get_model_inputs_lit(1)))
+  {
+    a0 = 0, al = NN - 2, ainc = 2;
+    b0 = 1, bl = NN - 1, binc = 2;
     msg("assuming ordering as in BTOR generated benchmarks");
-  } else {
-    a0 = 0, al = NN/2-1,   ainc = 1;
-    b0 = NN/2, bl = NN-1, binc = 1;
+  }
+  else
+  {
+    a0 = 0, al = NN / 2 - 1, ainc = 1;
+    b0 = NN / 2, bl = NN - 1, binc = 1;
     msg("assuming ordering as in the ABC generated or AOKI benchmarks");
   }
   if (verbose >= 2) {
