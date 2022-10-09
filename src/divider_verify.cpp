@@ -16,6 +16,7 @@ void dividerVerify(const char *inp_f, const char *out_f1, const char *out_f2)
 
   std::vector<Polynomial *> sub_poly_set = gen_substitute_poly();
 
+  msg("finished substitution equivlence class");
   // init_slices();
 
   // mark_xor_chain_in_last_slice();
@@ -363,7 +364,8 @@ const std::vector<Polynomial *> gen_substitute_poly()
     Polynomial *ep = reduce_base(p, equiv_poly);
     // msg("substituted polynomial: ");
     // ep->print(stdout);
-    substituted_poly.emplace_back(ep);
+    if (ep && !ep->is_constant_zero_poly())
+      substituted_poly.emplace_back(ep);
   }
   FILE *f = 0;
   f = fopen("substituted_poly", "w");
@@ -381,6 +383,8 @@ Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set)
   msg("");
   msg("");
   msg("started reducing");
+  fputs("[amulet2] polynomial is ", stdout);
+  p->print(stdout);
 
   Polynomial *rem = 0;
   Polynomial *rp = 0;

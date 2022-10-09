@@ -285,7 +285,7 @@ void gen_node_formula(Gate *g, int windowDepth)
 
 std::vector<Polynomial *> gen_equiv_poly()
 {
-    SBIF(5);
+    SBIF(10);
 
     std::vector<Polynomial *> poly_set;
 
