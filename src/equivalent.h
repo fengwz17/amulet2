@@ -20,10 +20,10 @@ int check_equiv_candidate(std::string, std::string);
 
 // build equivalence class
 void SBIF(int windowDepth);
-int valid_equiv(Gate *g, Gate *b, int windowDepth, int flag);
+void valid_equiv(Gate *g, Gate *b, int windowDepth, int flag);
 void gen_node_declare(Gate *g, int windowDepth);
 void gen_node_formula(Gate *g, int windowDepth);
 
-std::vector<Polynomial *> gen_equiv_poly();
+std::vector<Polynomial *> gen_equiv_poly(int window);
 
 #endif // AMULET2_SRC_EQUIVALENT_H_

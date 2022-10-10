@@ -117,7 +117,7 @@ void SBIF(int windowDepth)
             // if a \notin [b]
             if (equivClass[a_name].first != equivClass[b_name].first)
             {
-                int equiv_result = valid_equiv(gates[i], gates[j], windowDepth, equiv);
+                valid_equiv(gates[i], gates[j], windowDepth, equiv);
                 // std::cout << a_name << " " << b_name << " : " << equiv_result << "\n";
             }
         }
@@ -129,7 +129,7 @@ void SBIF(int windowDepth)
     // }
 }
 
-int valid_equiv(Gate *a, Gate *b, int windowDepth, int flag)
+void valid_equiv(Gate *a, Gate *b, int windowDepth, int flag)
 {
     std::ofstream fp;
     fp.open("valid.smt2");
@@ -202,14 +202,14 @@ int valid_equiv(Gate *a, Gate *b, int windowDepth, int flag)
                 equivClass[a_name] = pair_equiv(equivClass[b_name].first, false);
             }
         }
-        return 1;
+        // return 1;
     }
     else if (line != "sat")
     {
         msg("Unexpect SMT solver output!");
     }
 
-    return 0;
+    // return 0;
 }
 
 void gen_node_declare(Gate *g, int windowDepth)
@@ -283,9 +283,9 @@ void gen_node_formula(Gate *g, int windowDepth)
     }
 }
 
-std::vector<Polynomial *> gen_equiv_poly()
+std::vector<Polynomial *> gen_equiv_poly(int window)
 {
-    SBIF(10);
+    SBIF(window);
 
     std::vector<Polynomial *> poly_set;
 

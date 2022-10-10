@@ -11,7 +11,8 @@
 extern bool gen_witness_divider;
 /*------------------------------------------------------------------------*/
 
-void dividerVerify(const char *inp_f = 0,
+void dividerVerify(int window,
+                   const char *inp_f = 0,
                    const char *out_f1 = 0,
                    const char *out_f2 = 0);
 
@@ -38,7 +39,7 @@ const Polynomial *reduce_divider(FILE *file);
 // output: Q[NN/2 - 1], ..., Q[0], R[NN / 2 - 1], ..., R[0]
 void fix_order();
 
-const std::vector<Polynomial *> gen_substitute_poly();
+const std::vector<Polynomial *> gen_substitute_poly(int window);
 Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set);
 
 // Term *remainder_term(Term *t, Term *tv);

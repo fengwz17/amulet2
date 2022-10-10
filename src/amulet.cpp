@@ -86,6 +86,8 @@ static const char * output_name3 = 0;
 
 // / Selected mode, '-substitute' = 1, '-verify' = 2, '-certify' = 3
 static int mode;
+
+static int window = 0;
 /*------------------------------------------------------------------------*/
 /**
     Calls the deallocaters of the involved data types
@@ -203,9 +205,13 @@ int main(int argc, char ** argv) {
     {
       output_name1 = argv[i];
     }
-    else
+    else if (window)
     {
       input_name = argv[i];
+    }
+    else
+    {
+      window = std::atoi(argv[i]);
     }
   }
 
@@ -245,7 +251,7 @@ int main(int argc, char ** argv) {
   if (mode == 4)
   {
     init_gates_verify();
-    dividerVerify(input_name, output_name1, output_name2);
+    dividerVerify(window, input_name, output_name1, output_name2);
   }
   else
   {

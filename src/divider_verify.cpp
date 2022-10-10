@@ -3,7 +3,7 @@
 // Global variable
 bool gen_witness_divider = 1;
 
-void dividerVerify(const char *inp_f, const char *out_f1, const char *out_f2)
+void dividerVerify(int window, const char *inp_f, const char *out_f1, const char *out_f2)
 {
   FILE *f1 = 0, *f2 = 0;
   if (!(f1 = fopen(out_f1, "w")))
@@ -14,7 +14,7 @@ void dividerVerify(const char *inp_f, const char *out_f1, const char *out_f2)
 
   print_circuit_poly_divider(f1);
 
-  std::vector<Polynomial *> sub_poly_set = gen_substitute_poly();
+  std::vector<Polynomial *> sub_poly_set = gen_substitute_poly(window);
 
   msg("finished substitution equivlence class");
   // init_slices();
@@ -22,7 +22,6 @@ void dividerVerify(const char *inp_f, const char *out_f1, const char *out_f2)
   // mark_xor_chain_in_last_slice();
   init_time = process_time();
 
-  // remove_internal_xor_gates(NULL);
   // if (!upper_half_xor_output())
   // {
   //   msg("slicing based on input cones");
@@ -83,6 +82,8 @@ void dividerVerify(const char *inp_f, const char *out_f1, const char *out_f2)
 
 void print_circuit_poly_divider(FILE *file)
 {
+
+  // remove_internal_xor_gates(NULL);
   int max_num = 0;
   for (unsigned i = 0; i < num_gates; i++)
   {
@@ -191,19 +192,32 @@ Polynomial *divide_by_lt(const Polynomial *p, const Term *t)
 
 Polynomial *divide_by_lm(const Polynomial *p, const Monomial *tm)
 {
-  // p = 1, assume t is not constant, return 0
-  if (p->is_constant_one_poly())
+  // p = 1 or -1, assume t is not a constant, return 0
+  // if (p->is_constant_one_poly())
+  // {
+  //   // push_mstack_end(new Monomial(minus_one, 0));
+  //   Polynomial *pt = build_poly();
+  //   // Polynomial *pa = add_poly(p, pt);
+  //   // delete (pt);
+  //   return pt;
+  // }
+  Monomial *lm_tmp = p->get_mon(0);
+  if (p->size() == 1)
   {
-    push_mstack_end(new Monomial(minus_one, 0));
-    Polynomial *pt = build_poly();
-    Polynomial *pa = add_poly(p, pt);
-    delete (pt);
-    return pa;
+    if (!lm_tmp->get_term())
+    {
+      // if (mpz_cmp_si(lm_tmp->coeff, -1) == 0)
+      // {
+      //   std::cout << "-1\n";
+      // }
+      Polynomial *pt = build_poly();
+      return pt;
+    }
   }
 
   Term *t = tm->get_term();
   assert(t->size() == 1);
-  Monomial *lm_tmp = p->get_mon(0);
+
   Term *ttmp = lm_tmp->get_term();
 
   while (t)
@@ -223,6 +237,8 @@ Polynomial *divide_by_lm(const Polynomial *p, const Monomial *tm)
     }
     t = t->get_rest();
   }
+
+  // assume tm->coeff = 1 or -1
   mpz_t coeff;
   mpz_init(coeff);
   mpz_mul(coeff, lm_tmp->coeff, tm->coeff);
@@ -347,9 +363,9 @@ void fix_order()
   }
 }
 
-const std::vector<Polynomial *> gen_substitute_poly()
+const std::vector<Polynomial *> gen_substitute_poly(int window)
 {
-  std::vector<Polynomial *> equiv_poly = gen_equiv_poly();
+  std::vector<Polynomial *> equiv_poly = gen_equiv_poly(window);
   std::vector<Polynomial *> substituted_poly;
   substituted_poly.clear();
   for (auto i : equiv_poly)
@@ -438,6 +454,11 @@ Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set)
       if (lt_rp->is_constant_one_poly())
       {
         push_mstack_end(new Monomial(minus_one, 0));
+        neg_lt_rp = build_poly();
+      }
+      else if (rp->size() == 1 && !lm_tmp->get_term())
+      {
+        push_mstack_end(new Monomial(negCoeff, 0));
         neg_lt_rp = build_poly();
       }
       else
