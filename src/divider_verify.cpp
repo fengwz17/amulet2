@@ -20,7 +20,6 @@ void dividerVerify(int window, const char *inp_f, const char *out_f1, const char
   // init_slices();
 
   // mark_xor_chain_in_last_slice();
-  init_time = process_time();
 
   // if (!upper_half_xor_output())
   // {
@@ -46,7 +45,19 @@ void dividerVerify(int window, const char *inp_f, const char *out_f1, const char
   // divider spec
   Polynomial *divider_spec = print_spec_poly_divider(f2);
 
+  init_time = process_time();
+
+  slicing_elim_time = process_time();
+
+  msg("");
+  msg("");
+  msg("started reducing");
+
   const Polynomial *rem = reduce_base(divider_spec, sub_poly_set);
+
+  delete (divider_spec);
+
+  msg("finish reducing");
 
   // const Polynomial *rem = reduce_divider(f2);
   if (rem && !rem->is_constant_zero_poly())
@@ -69,6 +80,8 @@ void dividerVerify(int window, const char *inp_f, const char *out_f1, const char
     msg("");
     msg("CORRECT MULTIPLIER");
     msg("");
+    msg("REMAINDER IS 0");
+    msg("");
     msg("writing gate constraints to '%s' ", out_f1);
     msg("writing specification to '%s'    ", out_f2);
   }
@@ -82,8 +95,7 @@ void dividerVerify(int window, const char *inp_f, const char *out_f1, const char
 
 void print_circuit_poly_divider(FILE *file)
 {
-
-  // remove_internal_xor_gates(NULL);
+  // original circuit polynomials
   int max_num = 0;
   for (unsigned i = 0; i < num_gates; i++)
   {
@@ -216,7 +228,7 @@ Polynomial *divide_by_lm(const Polynomial *p, const Monomial *tm)
   }
 
   Term *t = tm->get_term();
-  assert(t->size() == 1);
+  // assert(t->size() == 1);
 
   Term *ttmp = lm_tmp->get_term();
 
@@ -366,23 +378,62 @@ void fix_order()
 const std::vector<Polynomial *> gen_substitute_poly(int window)
 {
   std::vector<Polynomial *> equiv_poly = gen_equiv_poly(window);
+  // std::map<std::string, pair_equiv> equivClass = get_equivClass();
   std::vector<Polynomial *> substituted_poly;
   substituted_poly.clear();
-  for (auto i : equiv_poly)
+  msg("find %d equivalent pairs.", equiv_poly.size());
+  if (verbose >= 3)
   {
-    i->print(stdout);
+    for (auto i : equiv_poly)
+    {
+      i->print(stdout);
+    }
   }
+
+  // print gate polynomials after xor rewriting
+  remove_internal_xor_gates_divider(NULL);
+  FILE *fx = 0;
+  fx = fopen("xor_rewriting_poly", "w");
   for (unsigned i = NN; i < num_gates; i++)
   {
-    Polynomial *p = gen_gate_constraint(i);
-    // msg("original polynomial: ");
-    // p->print(stdout);
-    Polynomial *ep = reduce_base(p, equiv_poly);
-    // msg("substituted polynomial: ");
-    // ep->print(stdout);
-    if (ep && !ep->is_constant_zero_poly())
-      substituted_poly.emplace_back(ep);
+    Polynomial *px = gates[i]->get_gate_constraint();
+    if (px)
+    {
+      px->print(fx);
+    }
   }
+  fclose(fx);
+
+  for (unsigned i = NN; i < num_gates; i++)
+  {
+    Polynomial *p = gates[i]->get_gate_constraint();
+    // std::cout << get_equivClass[gates[i]->get_var_name()].first << "\n";
+    // msg("original polynomial: ");
+    if (p)
+    {
+      // p->print(stdout);
+      Polynomial *ep = reduce_base(p, equiv_poly);
+      // msg("substituted polynomial: ");
+      // ep->print(stdout);
+      // bool same_flag = true;
+      if (ep && !ep->is_constant_zero_poly())
+      {
+        // for (int i = substituted_poly.size() - 1; i >= 0; i--)
+        // {
+        //   if (same_poly(substituted_poly[i], ep))
+        //   {
+        //     same_flag = false;
+        //     break;
+        //   }
+        // }
+        // if (same_flag == true)
+        if (get_equivClass[gates[i]->get_var_name()].first == i)
+          substituted_poly.emplace_back(ep);
+      }
+    }
+    // delete (p);
+  }
+
   FILE *f = 0;
   f = fopen("substituted_poly", "w");
   for (auto i : substituted_poly)
@@ -396,11 +447,11 @@ const std::vector<Polynomial *> gen_substitute_poly(int window)
 
 Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set)
 {
-  msg("");
-  msg("");
-  msg("started reducing");
-  fputs("[amulet2] polynomial is ", stdout);
-  p->print(stdout);
+  if (verbose >= 3)
+  {
+    fputs("[amulet2] polynomial is ", stdout);
+    p->print(stdout);
+  }
 
   Polynomial *rem = 0;
   Polynomial *rp = 0;
@@ -411,9 +462,10 @@ Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set)
 
   while (!rp->is_constant_zero_poly())
   {
-    unsigned i = 0;
+    // unsigned i = 0;
+    int i = poly_set_size - 1;
     bool division = false;
-    while (i < poly_set_size && division == false)
+    while (i >= 0 && division == false)
     {
       // Gate *g = gates[i];
       // if (g->get_elim())
@@ -424,23 +476,27 @@ Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set)
         fputs("[amulet2] reducing by ", stdout);
         pi->print(stdout);
       }
-      const Polynomial *negfactor = divide_by_lm(rp, pi->get_mon(0));
+      // const Polynomial *negfactor = divide_by_lm(rp, pi->get_mon(0));
+      const Polynomial *negfactor = divide_by_term(rp, pi->get_lt());
       if (negfactor->is_constant_zero_poly())
-        i++;
+        i--;
       else
       {
         Polynomial *mult = multiply_poly(negfactor, pi);
-        Polynomial *tmp = add_poly(rp, mult);
+        // Polynomial *tmp = add_poly(rp, mult);
+        rp = add_poly(rp, mult);
         delete (mult);
         division = true;
-        rp = tmp;
+        // rp = tmp;
         if (verbose >= 4)
         {
           fprintf(stdout, "[amulet2] reduced polynomial is ");
           rp->print(stdout);
         }
+        // delete (tmp);
       }
       delete (negfactor);
+      // delete (pi);
     }
     if (division == false)
     {
@@ -466,12 +522,10 @@ Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set)
         push_mstack_end(new Monomial(negCoeff, lm_tmp->get_term()->copy()));
         neg_lt_rp = build_poly();
       }
-      // Polynomial *tmp_rem = add_poly(rem, lt_rp);
-      // Polynomial *tmp_p = add_poly(rp, neg_lt_rp);
+
       if (rem)
       {
         rem = add_poly(rem, lt_rp);
-        delete (lt_rp);
       }
       else
       {
@@ -479,18 +533,26 @@ Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set)
       }
       rp = add_poly(rp, neg_lt_rp);
       mpz_clear(negCoeff);
+
+      // delete (lt_rp);
       delete (neg_lt_rp);
+      // delete (lm_tmp);
     }
   }
-  msg("finish reducing");
-  if (rem && !rem->is_constant_zero_poly())
+
+  delete (rp);
+
+  if (verbose >= 3)
   {
-    fprintf(stdout, "[amulet2] remainder is ");
-    rem->print(stdout);
-  }
-  else
-  {
-    fprintf(stdout, "[amulet2] remainder is 0;\n");
+    if (rem && !rem->is_constant_zero_poly())
+    {
+      fprintf(stdout, "[amulet2] remainder is ");
+      rem->print(stdout);
+    }
+    else
+    {
+      fprintf(stdout, "[amulet2] remainder is 0;\n");
+    }
   }
   return rem;
 }
@@ -513,3 +575,120 @@ Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set)
 //   }
 //   return ttmp;
 // }
+
+void remove_internal_xor_gates_divider(FILE *file)
+{
+  msg("remove internal xor gates");
+  int counter = 0;
+  for (unsigned i = NN; i < M - 1; i++)
+  {
+    Gate *n = gates[i];
+    if (n->get_xor_gate() != 1)
+      continue;
+    if (n->get_elim())
+      continue;
+    assert(n->children_size() == 2);
+
+    Gate *l_gate = n->children_front();
+    Gate *r_gate = n->children_back();
+    if (l_gate->get_xor_gate() != 2)
+      continue;
+    if (r_gate->get_xor_gate() != 2)
+      continue;
+    assert(l_gate->children_size() == 2);
+    assert(r_gate->children_size() == 2);
+    if (l_gate->parents_size() != 1 && r_gate->parents_size() != 1)
+      continue;
+    Gate *ll_gate = l_gate->children_front();
+    Gate *lr_gate = l_gate->children_back();
+
+    // set xor children to ll and lr by overwriting l and r
+
+    n->set_children_front(ll_gate);
+    n->set_children_back(lr_gate);
+
+    lr_gate->parents_push_back(n);
+    ll_gate->parents_push_back(n);
+    eliminate_by_one_gate(n, l_gate, file);
+
+    if (l_gate->parents_size() == 1)
+    {
+      if (proof == 1 || proof == 2)
+      {
+        assert(file);
+        print_pac_del_rule(file, l_gate->get_gate_constraint());
+      }
+      l_gate->mark_elim();
+      delete (l_gate->get_gate_constraint());
+      l_gate->set_gate_constraint(0);
+
+      if (verbose >= 3)
+        msg("removed %s", l_gate->get_var_name());
+      counter++;
+
+      ll_gate->parents_remove(l_gate);
+      lr_gate->parents_remove(l_gate);
+    }
+
+    eliminate_by_one_gate(n, r_gate, file);
+
+    if (r_gate->parents_size() == 1)
+    {
+      r_gate->mark_elim();
+      delete (r_gate->get_gate_constraint());
+      r_gate->set_gate_constraint(0);
+
+      if (verbose >= 3)
+        msg("removed %s", r_gate->get_var_name());
+      counter++;
+
+      ll_gate->parents_remove(r_gate);
+      lr_gate->parents_remove(r_gate);
+    }
+  }
+  if (verbose >= 1)
+    msg("removed %i internal xor gates", counter);
+
+  // for (unsigned i = NN; i < num_gates; i++)
+  // {
+  //   // Polynomial *rp = gen_gate_constraint(i);
+  //   // assert(rp);
+
+  //   // fprintf(file, "poly f%i = ", p->get_idx());
+  //   // p->print(file);
+  //   // max_num = p->get_idx();
+  //   // rp->print(stdout);
+  //   // delete (rp);
+  //   std::cout << gates[i]->get_var_name() << " ";
+  //   std::cout << "xor: " << gates[i]->get_xor_gate() << "\n";
+  //   Polynomial *rp = gates[i]->get_gate_constraint();
+  //   if (rp)
+  //     rp->print(stdout);
+  // }
+}
+
+bool same_poly(Polynomial *a, Polynomial *b)
+{
+  if (a->size() != b->size())
+  {
+    return false;
+  }
+  a->print(stdout);
+  b->print(stdout);
+  Polynomial *neg = divide_by_lm(a, b->get_mon(0));
+  neg->print(stdout);
+  if (neg->is_constant_zero_poly())
+    return false;
+  else
+  {
+    Polynomial *mult = multiply_poly(neg, b);
+    Polynomial *tmp = add_poly(a, mult);
+
+    a->print(stdout);
+    b->print(stdout);
+    tmp->print(stdout);
+    if (tmp->is_constant_zero_poly())
+      return true;
+  }
+  return false;
+}

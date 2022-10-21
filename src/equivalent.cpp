@@ -1,4 +1,5 @@
 #include "equivalent.h"
+#include "../deps/boolector/src/boolector.h"
 
 void simulate()
 {
@@ -92,10 +93,10 @@ void SBIF(int windowDepth)
     // initial
     build_simulate_vector();
 
-    for (unsigned i = NN; i < num_gates; i++)
+    for (unsigned i = 0; i < num_gates; i++)
     {
         std::string gate_name = gates[i]->get_var_name();
-        equivClass[gate_name] = pair_equiv(i, true);
+        equivClass[gate_name] = pair_equiv(i, 0);
     }
 
     // update equivalence class
@@ -117,8 +118,8 @@ void SBIF(int windowDepth)
             // if a \notin [b]
             if (equivClass[a_name].first != equivClass[b_name].first)
             {
-                valid_equiv(gates[i], gates[j], windowDepth, equiv);
-                // std::cout << a_name << " " << b_name << " : " << equiv_result << "\n";
+                if (valid_equiv(gates[i], gates[j], windowDepth, equiv) == 1)
+                    break;
             }
         }
     }
@@ -127,9 +128,11 @@ void SBIF(int windowDepth)
     //     std::string a_name = gates[i]->get_var_name();
     //     std::cout << equivClass[a_name].first << "\n";
     // }
+    // equivClassPoint = &equivClass;
+    get_equivClass = equivClass;
 }
 
-void valid_equiv(Gate *a, Gate *b, int windowDepth, int flag)
+int valid_equiv(Gate *a, Gate *b, int windowDepth, int flag)
 {
     std::ofstream fp;
     fp.open("valid.smt2");
@@ -148,6 +151,102 @@ void valid_equiv(Gate *a, Gate *b, int windowDepth, int flag)
         fp << "(declare-fun " << n << "() Bool)\n";
     }
     fp.close();
+
+    fp.open("valid.smt2", std::ios::app);
+
+    if (flag == 1)
+    {
+        // a xor b = ((not a) and (b)) or ((a) and (not b))
+        // if sat, there exists an assignment that prove a and b not equiv/anti-equiv
+        fp << "(assert (or (and (not " << a_name << ") " << b_name << ") (and " << a_name << " (not " << b_name << "))))\n";
+    }
+
+    else
+    {
+        assert(flag == -1);
+        fp << "(assert (or (and (not " << a_name << ") "
+           << "(not " << b_name << ")) (and " << a_name << " " << b_name << ")))\n";
+    }
+
+    fp.close();
+
+    gen_node_formula(a, windowDepth);
+    gen_node_formula(b, windowDepth);
+
+    fp.open("valid.smt2", std::ios::app);
+    fp << "(check-sat)\n";
+    fp.close();
+
+    std::string command = "boolector valid.smt2 > valid_output";
+    system(command.c_str());
+
+    std::ifstream FILE("valid_output");
+    std::string line;
+    getline(FILE, line);
+    if (line == "unsat")
+    {
+        if (verbose >= 3)
+        {
+            std::cout << a_name << " and " << b_name << " are (anti-)equivlent\n";
+        }
+        if (equivClass[a_name].first < equivClass[b_name].first)
+        {
+            if (flag == 1)
+            {
+                equivClass[b_name] = pair_equiv(equivClass[a_name].first, 1);
+            }
+            else if (flag == -1)
+            {
+                equivClass[b_name] = pair_equiv(equivClass[a_name].first, -1);
+            }
+        }
+        else
+        {
+            if (flag == 1)
+            {
+                equivClass[a_name] = pair_equiv(equivClass[b_name].first, 1);
+            }
+            else if (flag == -1)
+            {
+                equivClass[a_name] = pair_equiv(equivClass[b_name].first, -1);
+            }
+        }
+        return 1;
+    }
+    else if (line != "sat")
+    {
+        msg("Unexpect SMT solver output!");
+    }
+
+    return 0;
+}
+
+/*
+void valid_equiv_boolector(Gate *a, Gate *b, int windowDepth, int flag)
+{
+    // std::ofstream fp;
+    // fp.open("valid.smt2");
+    // fp << "(set-logic ALL)\n";
+    Btor *btor = boolector_new();
+    node_name.clear();
+
+    gen_node_declare(a, windowDepth);
+    gen_node_declare(b, windowDepth);
+
+    std::string a_name = a->get_var_name();
+    std::string b_name = b->get_var_name();
+    node_name.insert(a_name);
+    node_name.insert(b_name);
+
+    BoolectorSort boolsort = boolector_bool_sort(btor);
+    BoolectorNode *var;
+
+    for (auto n : node_name)
+    {
+        // fp << "(declare-fun " << n << "() Bool)\n";
+        var
+    }
+    // fp.close();
     gen_node_formula(a, windowDepth);
     gen_node_formula(b, windowDepth);
 
@@ -208,9 +307,8 @@ void valid_equiv(Gate *a, Gate *b, int windowDepth, int flag)
     {
         msg("Unexpect SMT solver output!");
     }
-
-    // return 0;
 }
+*/
 
 void gen_node_declare(Gate *g, int windowDepth)
 {
@@ -223,12 +321,20 @@ void gen_node_declare(Gate *g, int windowDepth)
         aiger_and *and1 = is_model_and(g->get_var_num());
         unsigned l = and1->rhs0, r = and1->rhs1;
         Gate *l_gate = gate(l), *r_gate = gate(r);
-        // std::cout << "l: " << l_gate->get_var_name() << "\n";
-        // std::cout << "r: " << r_gate->get_var_name() << "\n";
-        node_name.insert(l_gate->get_var_name());
-        node_name.insert(r_gate->get_var_name());
-        gen_node_declare(l_gate, windowDepth - 1);
-        gen_node_declare(r_gate, windowDepth - 1);
+        std::string l_name = l_gate->get_var_name();
+        std::string r_name = r_gate->get_var_name();
+        Gate *l_represent = gates[equivClass[l_name].first];
+        Gate *r_represent = gates[equivClass[r_name].first];
+        std::string l_represent_name = l_represent->get_var_name();
+        std::string r_represent_name = r_represent->get_var_name();
+        // node_name.insert(l_gate->get_var_name());
+        // node_name.insert(r_gate->get_var_name());
+        // gen_node_declare(l_gate, windowDepth - 1);
+        // gen_node_declare(r_gate, windowDepth - 1);
+        node_name.insert(l_represent_name);
+        node_name.insert(r_represent_name);
+        gen_node_declare(l_represent, windowDepth - 1);
+        gen_node_declare(r_represent, windowDepth - 1);
     }
 }
 
@@ -246,6 +352,14 @@ void gen_node_formula(Gate *g, int windowDepth)
         Gate *l_gate = gate(l), *r_gate = gate(r);
         std::string l_name = l_gate->get_var_name();
         std::string r_name = r_gate->get_var_name();
+        Gate *l_represent = gates[equivClass[l_name].first];
+        Gate *r_represent = gates[equivClass[r_name].first];
+        std::string l_represent_name = l_represent->get_var_name();
+        std::string r_represent_name = r_represent->get_var_name();
+        if (equivClass[l_name].second == -1)
+            l_represent_name = "(not " + l_represent_name + ")";
+        if (equivClass[r_name].second == -1)
+            r_represent_name = "(not " + r_represent_name + ")";
         std::string l_literal;
         std::string r_literal;
 
@@ -264,13 +378,13 @@ void gen_node_formula(Gate *g, int windowDepth)
          */
 
         if (aiger_sign(l) == 0)
-            l_literal = l_name;
+            l_literal = l_represent_name;
         else
-            l_literal = "(not " + l_name + ")";
+            l_literal = "(not " + l_represent_name + ")";
         if (aiger_sign(r) == 0)
-            r_literal = r_name;
+            r_literal = r_represent_name;
         else
-            r_literal = "(not " + r_name + ")";
+            r_literal = "(not " + r_represent_name + ")";
         // fprintf(f, "(assert (and %s %s))\n", l_literal.c_str(), r_literal.c_str());
 
         std::ofstream fp;
@@ -278,13 +392,15 @@ void gen_node_formula(Gate *g, int windowDepth)
         fp << "(assert (= " << g_name << " (and " << l_literal << " " << r_literal << ")))\n";
         fp.close();
 
-        gen_node_formula(l_gate, windowDepth - 1);
-        gen_node_formula(r_gate, windowDepth - 1);
+        gen_node_formula(l_represent, windowDepth - 1);
+        gen_node_formula(r_represent, windowDepth - 1);
     }
 }
 
 std::vector<Polynomial *> gen_equiv_poly(int window)
 {
+    // print_dependency_all();
+
     SBIF(window);
 
     std::vector<Polynomial *> poly_set;
@@ -299,7 +415,7 @@ std::vector<Polynomial *> gen_equiv_poly(int window)
         {
             Gate *gs = gates[equiv_tag.first];
             // std::cout << "Should substitute " << g->get_var_name() << " to " << gs->get_var_name() << "\n";
-            if (equiv_tag.second == true)
+            if (equiv_tag.second == 1)
             {
                 const Var *v1 = g->get_var();
                 Term *t1 = new_term(v1, 0);
@@ -312,7 +428,7 @@ std::vector<Polynomial *> gen_equiv_poly(int window)
             }
             else
             {
-                assert(equiv_tag.second == false);
+                assert(equiv_tag.second == -1);
                 const Var *v1 = g->get_var();
                 Term *t1 = new_term(v1, 0);
                 Monomial *m1 = new Monomial(minus_one, t1);
@@ -331,4 +447,74 @@ std::vector<Polynomial *> gen_equiv_poly(int window)
     }
 
     return poly_set;
+}
+
+void print_dependency_all()
+{
+    std::ofstream fp;
+    fp.open("dependency");
+    fp.close();
+
+    for (unsigned i = NN; i < num_gates; i++)
+    {
+        fp.open("dependency", std::ios::app);
+        fp << "\n";
+        // fp << gates[i]->get_var_name() << " ";
+        fp.close();
+        int depth = 0;
+        max_depth = 0;
+        print_dependency_gate(gates[i], depth);
+    }
+}
+
+void print_dependency_gate(Gate *g, int depth)
+{
+    if (g->get_input())
+    {
+        if (depth > max_depth)
+        {
+            std::ofstream fp;
+            fp.open("dependency", std::ios::app);
+            max_depth = depth;
+            fp << max_depth << " ";
+            fp.close();
+        }
+
+        return;
+    }
+    depth++;
+
+    std::string g_name = g->get_var_name();
+    // std::cout << g->get_var_name() << " ";
+    if (!g->get_output())
+    {
+        aiger_and *and1 = is_model_and(g->get_var_num());
+        unsigned l = and1->rhs0, r = and1->rhs1;
+        Gate *l_gate = gate(l), *r_gate = gate(r);
+        std::string l_name = l_gate->get_var_name();
+        std::string r_name = r_gate->get_var_name();
+        // int l_value, r_value;
+        // std::cout << aiger_sign(l) << " " << l_gate->get_var_name()
+        //           << " " << aiger_sign(r) << " " << r_gate->get_var_name() << '\n';
+
+        // l_value = (aiger_sign(l) == 1) ? 1 - gateSim[l_name].back() : gateSim[l_name].back();
+        // r_value = (aiger_sign(r) == 1) ? 1 - gateSim[r_name].back() : gateSim[r_name].back();
+        // gateSim[g_name].emplace_back(l_value * r_value);
+        // fp << "(" << l_gate->get_var_name() << ", " << r_gate->get_var_name() << ") ";
+        // fp.close();
+        print_dependency_gate(l_gate, depth);
+        print_dependency_gate(r_gate, depth);
+    }
+    else
+    {
+        assert(g->get_output());
+        Gate *output_child_gate = g->children_front();
+        std::string output_child = output_child_gate->get_var_name();
+        // fp << output_child << " ";
+        // fp.close();
+        print_dependency_gate(output_child_gate, depth);
+        // int output_child_value = (aiger_sign(slit(i - M + 1)) == 1) ? 1 - gateSim[output_child].back() : gateSim[output_child].back();
+        // gateSim[g_name].emplace_back(output_child_value);
+        // std::cout << aiger_sign(slit(i - M + 1)) << " " << model_output_gate->get_var_name() << "\n";
+    }
 }

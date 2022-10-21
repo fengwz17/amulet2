@@ -43,5 +43,10 @@ const std::vector<Polynomial *> gen_substitute_poly(int window);
 Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set);
 
 // Term *remainder_term(Term *t, Term *tv);
+void remove_internal_xor_gates_divider(FILE *file);
+
+bool same_poly(Polynomial *a, Polynomial *b);
+
+std::map<std::string, pair_equiv> get_equivClass;
 
 #endif // AMULET2_SRC_DIVIDER_VERIFY_H_
