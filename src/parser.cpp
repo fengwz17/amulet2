@@ -31,6 +31,18 @@ void determine_input_order() {
     a0 = 0, al = NN / 2 - 1, ainc = 1;
     msg("assuming divider ordering as in boolector generated benchmarks");
   }
+  else if (divider_order == 2)
+  {
+    a0 = 0, al = NN / 3 - 1, ainc = 1;
+    b0 = NN / 3, bl = NN - 1, binc = 1;
+    // sl = OU - 1;
+    // sl = NN + 2;
+    // sl = NN + 1;
+
+    // new_nonres, res 2n - 1 output bit
+    sl = 2 * NN / 3;
+    msg("assuming divider ordering as in yosys generated benchmarks");
+  }
   else if (match_and(
                slit(0),
                get_model_inputs_lit(0),
@@ -47,27 +59,46 @@ void determine_input_order() {
     msg("assuming ordering as in the ABC generated or AOKI benchmarks");
   }
   if (verbose >= 2) {
-    if (NN == 2) {
-      msg("a[0] = input[%d]", a0);
-      msg("b[0] = input[%d]", b0);
-      msg("s[0] = output[%d]", s0);
-    } else if (NN == 4) {
-      msg("(a[0], a[1]) =(input[%d], input[%d])", a0, al);
-      msg("(b[0], b[1]) =(input[%d], input[%d])", b0, bl);
-      msg("(s[0], ..., s[3]) =(output[%d], ..., output[%d])", s0, sl);
-    } else if (NN == 6) {
-      msg("(a[0], a[1], a[2]) =(input[%d], input[%d], input[%d])",
-        a0, a0 + ainc, al);
-      msg("(b[0], b[1], b[2]) =(input[%d], input[%d], input[%d])",
-        b0, b0 + binc, bl);
-      msg("(s[0], ..., s[5]) =(output[%d], ..., output[%d])", s0, sl);
-    } else {
+    if (divider_order == 2)
+    {
       msg("(a[0], a[1], ..., a[%d]) =(input[%d], input[%d], ..., input[%d])",
-        NN/2-1, a0, a0 + ainc, al);
+          NN / 3 - 1, a0, a0 + ainc, al);
       msg("(b[0], b[1], ..., b[%d]) =(input[%d], input[%d], ..., input[%d])",
-        NN/2-1, b0, b0 + binc, bl);
+          2 * NN / 3 - 1, b0, b0 + binc, bl);
       msg("(s[0], ..., s[%d]) =(output[%d], ..., output[%d])",
-        NN-1, s0, sl);
+          2 * NN / 3, s0, sl);
+    }
+    else
+    {
+      if (NN == 2)
+      {
+        msg("a[0] = input[%d]", a0);
+        msg("b[0] = input[%d]", b0);
+        msg("s[0] = output[%d]", s0);
+      }
+      else if (NN == 4)
+      {
+        msg("(a[0], a[1]) =(input[%d], input[%d])", a0, al);
+        msg("(b[0], b[1]) =(input[%d], input[%d])", b0, bl);
+        msg("(s[0], ..., s[3]) =(output[%d], ..., output[%d])", s0, sl);
+      }
+      else if (NN == 6)
+      {
+        msg("(a[0], a[1], a[2]) =(input[%d], input[%d], input[%d])",
+            a0, a0 + ainc, al);
+        msg("(b[0], b[1], b[2]) =(input[%d], input[%d], input[%d])",
+            b0, b0 + binc, bl);
+        msg("(s[0], ..., s[5]) =(output[%d], ..., output[%d])", s0, sl);
+      }
+      else
+      {
+        msg("(a[0], a[1], ..., a[%d]) =(input[%d], input[%d], ..., input[%d])",
+            NN / 2 - 1, a0, a0 + ainc, al);
+        msg("(b[0], b[1], ..., b[%d]) =(input[%d], input[%d], ..., input[%d])",
+            NN / 2 - 1, b0, b0 + binc, bl);
+        msg("(s[0], ..., s[%d]) =(output[%d], ..., output[%d])",
+            NN - 1, s0, sl);
+      }
     }
   }
 }
@@ -77,15 +108,17 @@ void determine_input_order() {
 void init_aiger_with_checks() {
   if (get_model_num_latches()) die("can not handle latches");
   if (!get_model_num_inputs()) die("no inputs");
-  if ((get_model_num_inputs() & 1)) die("odd number of inputs");
+  // if ((get_model_num_inputs() & 1)) die("odd number of inputs");
   if (!get_model_num_outputs()) die("no outputs");
-  if (get_model_num_outputs() == get_model_num_inputs()) {
-    M = get_model_maxvar() + 1;
-    NN = get_model_num_outputs();
-  }
-  else  die("expected %u but got %u outputs",
-      get_model_num_inputs(), get_model_num_outputs());
-
+  // if (get_model_num_outputs() == get_model_num_inputs()) {
+  //   M = get_model_maxvar() + 1;
+  //   NN = get_model_num_outputs();
+  // }
+  // else  die("expected %u but got %u outputs",
+  //     get_model_num_inputs(), get_model_num_outputs());
+  M = get_model_maxvar() + 1;
+  NN = get_model_num_inputs();
+  OU = get_model_num_outputs();
 
   msg("MILOA %u %u %u %u %u",
     get_model_maxvar(),

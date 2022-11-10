@@ -9,7 +9,7 @@
 #include "aig.h"
 /*------------------------------------------------------------------------*/
 // Global Variables
-unsigned M, NN;
+unsigned M, NN, OU;
 unsigned a0, al, ainc;
 unsigned b0, bl, binc;
 

@@ -88,7 +88,7 @@ Gate * gate(unsigned lit) {
 
 void allocate_gates(bool assert) {
   unsigned aiger;
-  num_gates = M + NN - 1;
+  num_gates = M + OU - 1;
 
   msg("allocating %i gates", num_gates);
   gates = new Gate*[num_gates];
@@ -136,7 +136,8 @@ void allocate_gates(bool assert) {
 /*------------------------------------------------------------------------*/
 
 void mark_aig_outputs() {
-  for (unsigned i = 0; i < NN; i++) {
+  for (unsigned i = 0; i < OU; i++)
+  {
     unsigned lit = slit(i);
     if(lit < 2) continue;
     Gate * n = gate(lit);
@@ -330,7 +331,8 @@ void set_parents_and_children(bool set_children) {
   }
 
   // set children for extra outputs
-  for (unsigned i = 0; i < NN; i++) {
+  for (unsigned i = 0; i < OU; i++)
+  {
     Gate * n = gates[i+M-1];
     assert(n->get_output());
     unsigned lit = slit(i);
@@ -401,7 +403,7 @@ static Polynomial * get_node_constraint(Gate * g, unsigned sign){
 /*------------------------------------------------------------------------*/
 
 Polynomial * gen_gate_constraint(unsigned i) {
-  assert(i >= NN && i < M + NN - 1);
+  assert(i >= NN && i < M + OU - 1);
   Polynomial * p = 0;
   // gate constraint
   if (i < M-1) {
@@ -473,7 +475,7 @@ Polynomial * gen_gate_constraint(unsigned i) {
 
 
 void init_gate_constraint(unsigned i) {
-  assert(i >= NN && i < M + NN - 1);
+  assert(i >= NN && i < M + OU - 1);
   Polynomial * p = gen_gate_constraint(i);
   Gate * n = gates[i];
   n->set_gate_constraint(p);
@@ -485,7 +487,8 @@ void init_gate_constraints() {
     init_gate_constraint(i);
   }
 
-  for (unsigned i = 0; i < NN; i++) {
+  for (unsigned i = 0; i < OU; i++)
+  {
     init_gate_constraint(i+M-1);
   }
 }

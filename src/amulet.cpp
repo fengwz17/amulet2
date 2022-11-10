@@ -88,6 +88,8 @@ static const char * output_name3 = 0;
 static int mode;
 
 static int window = 0;
+
+static int split_num = 0;
 /*------------------------------------------------------------------------*/
 /**
     Calls the deallocaters of the involved data types
@@ -97,7 +99,9 @@ static int window = 0;
     @see deallocate_mstack()
     @see clear_mpz()
 */
-static void reset_all() {
+static void
+reset_all()
+{
   reset_all_signal_handlers();
   delete_gates();
   deallocate_terms();
@@ -149,7 +153,6 @@ int main(int argc, char ** argv) {
       {
         msg("selected mode: divider verification");
         mode = 4;
-        divider_order = 1;
       }
       else
       {
@@ -188,6 +191,18 @@ int main(int argc, char ** argv) {
     {
       gen_witness = 0;
     }
+    else if (!strcmp(argv[i], "-do1"))
+    {
+      divider_order = 1;
+    }
+    else if (!strcmp(argv[i], "-do2"))
+    {
+      divider_order = 2;
+    }
+    else if (!strcmp(argv[i], "-do3"))
+    {
+      divider_order = 3;
+    }
     else if (output_name3)
     {
       die("too many arguments '%s', '%s', '%s', '%s' and '%s'(try '-h')",
@@ -209,9 +224,13 @@ int main(int argc, char ** argv) {
     {
       input_name = argv[i];
     }
-    else
+    else if (split_num)
     {
       window = std::atoi(argv[i]);
+    }
+    else
+    {
+      split_num = std::atoi(argv[i]);
     }
   }
 
@@ -251,7 +270,7 @@ int main(int argc, char ** argv) {
   if (mode == 4)
   {
     init_gates_verify();
-    dividerVerify(window, input_name, output_name1, output_name2);
+    dividerVerify(split_num, window, input_name, output_name1, output_name2);
   }
   else
   {

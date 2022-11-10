@@ -2,7 +2,6 @@
 #define AMULET2_SRC_DIVIDER_VERIFY_H_
 /*------------------------------------------------------------------------*/
 #include "elimination.h"
-#include "parser.h"
 #include "equivalent.h"
 /*------------------------------------------------------------------------*/
 // / If final remainder is not equal to zero a counter example is generated and
@@ -11,10 +10,18 @@
 extern bool gen_witness_divider;
 /*------------------------------------------------------------------------*/
 
-void dividerVerify(int window,
+void dividerVerify(int split_num,
+                   int window,
                    const char *inp_f = 0,
                    const char *out_f1 = 0,
                    const char *out_f2 = 0);
+
+void split_solver(int split_num, int window, mpz_t low, mpz_t upper, Polynomial *spec, std::map<std::string, int> fix_q_value);
+
+void dividerVerify_backup(int window,
+                          const char *inp_f = 0,
+                          const char *out_f1 = 0,
+                          const char *out_f2 = 0);
 
 void print_circuit_poly_divider(FILE *file);
 
@@ -39,14 +46,14 @@ const Polynomial *reduce_divider(FILE *file);
 // output: Q[NN/2 - 1], ..., Q[0], R[NN / 2 - 1], ..., R[0]
 void fix_order();
 
-const std::vector<Polynomial *> gen_substitute_poly(int window);
+const std::vector<Polynomial *> gen_substitute_poly(int split_num, int window, mpz_t l, mpz_t m, std::map<std::string, int> fix_q_value);
 Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set);
+
+bool validate_rem(Polynomial *rem);
 
 // Term *remainder_term(Term *t, Term *tv);
 void remove_internal_xor_gates_divider(FILE *file);
 
 bool same_poly(Polynomial *a, Polynomial *b);
-
-std::map<std::string, pair_equiv> get_equivClass;
 
 #endif // AMULET2_SRC_DIVIDER_VERIFY_H_

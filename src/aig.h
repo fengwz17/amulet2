@@ -20,6 +20,7 @@ extern "C" {
 
 extern unsigned M;   // /< stores the maximum variable num of the input AIG
 extern unsigned NN;  // /< stores the number of inputs of the input AIG
+extern unsigned OU;
 
 extern unsigned a0;    // /< input value for the LSB of input vector A
 extern unsigned al;    // /< input value for the MSB of input vector A
