@@ -17,7 +17,7 @@ $(BUILD_PATH)%.o: $(SRC_PATH)%.cpp
 	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
 
 amulet: $(OBJECTS) aiger
-	$(CC) $(CFLAGS)  -o  $@ $(OBJECTS) includes/aiger.o -lgmp
+	$(CC) $(CFLAGS)  -o  $@ $(OBJECTS) includes/aiger.o -lgmp -lz3
 
 clean:
 	rm -f amulet makefile includes/aiger.o \

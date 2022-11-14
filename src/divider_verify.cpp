@@ -2,6 +2,9 @@
 /*------------------------------------------------------------------------*/
 // Global variable
 bool gen_witness_divider = 1;
+int window_depth = 0;
+int global_split_num = 0;
+
 std::map<std::string, pair_equiv> get_equivClass;
 
 void dividerVerify(int split_num, int window, const char *inp_f, const char *out_f1, const char *out_f2)
@@ -66,6 +69,10 @@ void dividerVerify(int split_num, int window, const char *inp_f, const char *out
   mpz_pow_ui(step, base, NN / 3 - local_split_num + 1);
   std::map<std::string, int> fix_q_value;
   fix_q_value.clear();
+
+  window_depth = window;
+  global_split_num = split_num;
+  construct_gate_map();
 
   double start_all = process_time();
 
@@ -345,6 +352,8 @@ void split_solver(int split_num, int window, mpz_t low, mpz_t upper, Polynomial 
   // mpz_set_ui(l, 0);
   // mpz_pow_ui(u, base, NN / 3);
   std::vector<Polynomial *> sub_poly_set = gen_substitute_poly(split_num, window, low, upper, fix_q_value);
+  // // std::vector<Polynomial *> sub_poly_set = gen_substitute_poly_candidate(split_num, window, low, upper, fix_q_value);
+  // std::vector<Polynomial *> sub_poly_set = gen_original_poly();
 
   msg("finished substitution equivlence class");
 
@@ -365,6 +374,7 @@ void split_solver(int split_num, int window, mpz_t low, mpz_t upper, Polynomial 
   start_reduce = process_time();
 
   Polynomial *rem = reduce_base(split_spec, sub_poly_set);
+  // Polynomial *rem = reduce_with_valid(split_spec, sub_poly_set, low, upper);
 
   finish_reduce = process_time();
 
@@ -379,9 +389,9 @@ void split_solver(int split_num, int window, mpz_t low, mpz_t upper, Polynomial 
   // const Polynomial *rem = reduce_divider(f2);
   if (rem && !rem->is_constant_zero_poly())
   {
-    msg("REMAINDER IS");
-    fputs("[amulet2] ", stdout);
-    rem->print(stdout);
+    // msg("REMAINDER IS");
+    // fputs("[amulet2] ", stdout);
+    // rem->print(stdout);
     msg("");
     msg("START FINAL REMAINDER EVALUATION");
     if (validate_rem(rem) == true)
@@ -501,6 +511,14 @@ void print_circuit_poly_divider(FILE *file)
   }
 }
 
+void construct_gate_map()
+{
+  for (unsigned i = 0; i < num_gates; i++)
+  {
+    gateMap[gates[i]->get_var_name()] = i;
+  }
+}
+
 Polynomial *print_spec_poly_divider(FILE *file)
 {
   mpz_t coeff;
@@ -561,8 +579,14 @@ Polynomial *print_spec_poly_divider(FILE *file)
     // remainder
     // for (unsigned int i = 0; i <= NN / 3; i++)
     // for (unsigned int i = 0; i < 2 * NN / 3; i++)
+
+    // no-opt
     for (int i = 2 * NN / 3; i >= 0; i--)
+
+    // old
     // for (int i = NN / 3; i >= 0; i--)
+
+    // new and res
     // for (int i = NN / 3 - 1; i >= 0; i--)
     {
       const Var *sr = gates[i + NN / 3 + 1 + M - 1]->get_var();
@@ -817,7 +841,10 @@ const Polynomial *reduce_divider(FILE *file)
 
   const std::vector<Polynomial *> gen_substitute_poly(int split_num, int window, mpz_t l, mpz_t u, std::map<std::string, int> fix_q_value)
   {
-    std::vector<Polynomial *> equiv_poly = gen_equiv_poly(window, l, u);
+    int if_nosplit = 1;
+    if (split_num > 0)
+      if_nosplit = split_num;
+    std::vector<Polynomial *> equiv_poly = gen_equiv_poly(if_nosplit, window, l, u);
     // std::map<std::string, pair_equiv> equivClass = get_equivClass();
     std::vector<Polynomial *> substituted_poly;
     substituted_poly.clear();
@@ -978,41 +1005,12 @@ const Polynomial *reduce_divider(FILE *file)
           // l_poly->print(stdout);
           // fix_q_poly_vec.emplace_back(q_poly);
           // fix_q_poly_vec.emplace_back(l_poly);
-          substituted_poly[idex] = q_poly;
+          // substituted_poly[idex] = q_poly;
           l_poly_map[ln] = l_poly;
         }
         idex--;
       }
     }
-    // for (unsigned i = NN; i < num_gates; i++)
-    // {
-    //   Polynomial *p = gates[i]->get_gate_constraint();
-    //   // std::cout << get_equivClass[gates[i]->get_var_name()].first << "\n";
-    //   // msg("original polynomial: ");
-    //   if (p)
-    //   {
-    //     // p->print(stdout);
-    //     Polynomial *ep = reduce_base(p, equiv_poly);
-    //     // msg("substituted polynomial: ");
-    //     // ep->print(stdout);
-    //     // bool same_flag = true;
-    //     if (ep && !ep->is_constant_zero_poly())
-    //     {
-    //       // for (int i = substituted_poly.size() - 1; i >= 0; i--)
-    //       // {
-    //       //   if (same_poly(substituted_poly[i], ep))
-    //       //   {
-    //       //     same_flag = false;
-    //       //     break;
-    //       //   }
-    //       // }
-    //       // if (same_flag == true)
-    //       if (get_equivClass[gates[i]->get_var_name()].first == i)
-    //         substituted_poly.emplace_back(ep);
-    //     }
-    //   }
-    //   // delete (p);
-    // }
 
     FILE *f = 0;
     f = fopen("substituted_poly", "w");
@@ -1025,7 +1023,221 @@ const Polynomial *reduce_divider(FILE *file)
     return substituted_poly;
   }
 
-  Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set)
+  const std::vector<Polynomial *> gen_original_poly()
+  {
+    std::vector<Polynomial *> original_poly;
+    original_poly.clear();
+    for (unsigned i = NN; i < num_gates; i++)
+    {
+      Polynomial *p = gates[i]->get_gate_constraint();
+      original_poly.emplace_back(p);
+    }
+    return original_poly;
+  }
+
+  const std::vector<Polynomial *> gen_substitute_poly_candidate(int split_num, int window, mpz_t l, mpz_t u, std::map<std::string, int> fix_q_value)
+  {
+    int if_nosplit = 1;
+    if (split_num > 0)
+      if_nosplit = split_num;
+    std::vector<Polynomial *> equiv_poly = gen_equiv_poly_candidate(if_nosplit, window, l, u);
+
+    // std::map<std::string, pair_equiv> equivClass = get_equivClass();
+    std::vector<Polynomial *> substituted_poly;
+    substituted_poly.clear();
+
+    msg("find %d equivalent candidate pairs.", equiv_poly.size());
+    FILE *fe = 0;
+    fe = fopen("equiv_poly_candidate", "w");
+    // if (verbose >= 3)
+    // {
+    for (auto i : equiv_poly)
+    {
+      i->print(fe);
+    }
+    // }
+    fclose(fe);
+
+    // print gate polynomials after xor rewriting
+    // remove_internal_xor_gates_divider(NULL);
+    // FILE *fx = 0;
+    // fx = fopen("xor_rewriting_poly", "w");
+    // for (unsigned i = NN; i < num_gates; i++)
+    // {
+    //   Polynomial *px = gates[i]->get_gate_constraint();
+    //   if (px)
+    //   {
+    //     px->print(fx);
+    //   }
+    // }
+    // fclose(fx);
+
+    for (unsigned i = NN; i < num_gates; i++)
+    {
+      Polynomial *p = gates[i]->get_gate_constraint();
+      // std::cout << get_equivClass[gates[i]->get_var_name()].first << "\n";
+      // msg("original polynomial: ");
+      if (p)
+      {
+        // p->print(stdout);
+        Polynomial *ep = reduce_base(p, equiv_poly);
+        // msg("substituted polynomial: ");
+        // ep->print(stdout);
+        // bool same_flag = true;
+        if (ep && !ep->is_constant_zero_poly())
+        {
+          // for (int i = substituted_poly.size() - 1; i >= 0; i--)
+          // {
+          //   if (same_poly(substituted_poly[i], ep))
+          //   {
+          //     same_flag = false;
+          //     break;
+          //   }
+          // }
+          // if (same_flag == true)
+          if (get_equivClass[gates[i]->get_var_name()].first == i)
+            substituted_poly.emplace_back(ep);
+        }
+      }
+      // delete (p);
+    }
+
+    // needs to be changed
+    if (split_num > 0)
+    {
+      // use input splitting
+      std::map<std::string, int> fix_q = fix_q_value;
+      std::map<std::string, Polynomial *> l_poly_map;
+      std::vector<Polynomial *> fix_q_poly_vec;
+      // for (auto m : fix_q)
+      // {
+      //   /std::cout << m.first << " " << m.second << "\n";
+      // }
+      int idex = substituted_poly.size() - 1;
+      int fix_i = 0;
+      l_poly_map.clear();
+      while (idex >= 0) // && fix_i < fix_q.size())
+      {
+        Polynomial *pi = substituted_poly[idex];
+        std::string sn = pi->get_lt()->get_var_name();
+        std::string ln = pi->get_mon(1)->get_term()->get_var_name();
+        // std::cout << sn << "\n";
+        if (l_poly_map.count(sn))
+        {
+          // std::cout << ln << "\n";
+          // substituted_poly[idex]->print(stdout);
+          // l_poly_map[sn]->print(stdout);
+          substituted_poly[idex] = l_poly_map[sn];
+        }
+        if (fix_q.count(sn))
+        {
+          fix_i++;
+          Polynomial *q_poly = 0;
+          Polynomial *l_poly = 0;
+          mpz_t lcoeff, coeff;
+          mpz_init(lcoeff);
+          mpz_init(coeff);
+          int value = fix_q[sn];
+          mpz_set(coeff, pi->get_mon(1)->coeff);
+          mpz_neg(lcoeff, coeff);
+
+          // s = l
+          if (mpz_cmp_ui(coeff, 1) == 0)
+          {
+            Term *t1 = pi->get_mon(1)->get_term();
+            Term *ts = pi->get_lt();
+            Monomial *m1 = new Monomial(lcoeff, t1);
+            Monomial *ms = new Monomial(lcoeff, ts);
+            Monomial *constant_one = new Monomial(coeff, 0);
+            if (value == 0)
+            {
+              push_mstack_end(m1);
+              l_poly = build_poly();
+              push_mstack_end(ms);
+              q_poly = build_poly();
+            }
+            // -l + 1, -s + 1
+            if (value == 1)
+            {
+              push_mstack_end(m1);
+              push_mstack_end(constant_one);
+              l_poly = build_poly();
+              push_mstack_end(ms);
+              push_mstack_end(constant_one);
+              q_poly = build_poly();
+            }
+          }
+          else
+          {
+            Term *t1 = pi->get_mon(1)->get_term();
+            Term *ts = pi->get_lt();
+            Monomial *m1 = new Monomial(coeff, t1);
+            Monomial *ms = new Monomial(coeff, ts);
+            if (value == 1)
+            {
+              // -l
+              push_mstack_end(m1);
+              l_poly = build_poly();
+
+              // -s + 1
+              push_mstack_end(ms);
+              Monomial *constant_one = new Monomial(lcoeff, 0);
+              push_mstack_end(constant_one);
+              q_poly = build_poly();
+            }
+            if (value == 0)
+            {
+              // -l + 1
+              push_mstack_end(m1);
+              Monomial *constant_one = new Monomial(lcoeff, 0);
+              push_mstack_end(constant_one);
+              l_poly = build_poly();
+
+              // -s
+              push_mstack_end(ms);
+              q_poly = build_poly();
+            }
+          }
+
+          // q_poly->print(stdout);
+          // l_poly->print(stdout);
+          // fix_q_poly_vec.emplace_back(q_poly);
+          // fix_q_poly_vec.emplace_back(l_poly);
+          // substituted_poly[idex] = q_poly;
+          l_poly_map[ln] = l_poly;
+        }
+        idex--;
+      }
+    }
+
+    FILE *f = 0;
+    f = fopen("substituted_poly_candidate", "w");
+    for (auto i : substituted_poly)
+    {
+      // i->print(stdout);
+      i->print(f);
+    }
+    fclose(f);
+    return substituted_poly;
+  }
+
+  Polynomial *reduce_by_equiv_poly(const Polynomial *p1, const Polynomial *p2)
+  {
+
+    const Polynomial *negfactor = divide_by_term(p1, p2->get_lt());
+    if (negfactor->is_constant_zero_poly())
+      return p1->copy();
+
+    Polynomial *mult = multiply_poly(negfactor, p2);
+    Polynomial *rem = add_poly(p1, mult);
+
+    delete (mult);
+    delete (negfactor);
+
+    return rem;
+  }
+
+  Polynomial *reduce_base_back(Polynomial *p, std::vector<Polynomial *> poly_set)
   {
     if (verbose >= 3)
     {
@@ -1121,6 +1333,311 @@ const Polynomial *reduce_divider(FILE *file)
     }
 
     delete (rp);
+
+    if (verbose >= 3)
+    {
+      if (rem && !rem->is_constant_zero_poly())
+      {
+        fprintf(stdout, "[amulet2] remainder is ");
+        rem->print(stdout);
+      }
+      else
+      {
+        fprintf(stdout, "[amulet2] remainder is 0;\n");
+      }
+    }
+    return rem;
+  }
+
+  Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set)
+  {
+    if (verbose >= 3)
+    {
+      fputs("[amulet2] polynomial is ", stdout);
+      p->print(stdout);
+    }
+
+    Polynomial *rem = 0;
+    Polynomial *rp = 0;
+    // Polynomial *tmp;
+
+    rp = p;
+    unsigned int poly_set_size = poly_set.size();
+
+    // while (!rp->is_constant_zero_poly())
+    // {
+    // unsigned i = 0;
+    int i = poly_set_size - 1;
+    bool division = false;
+    while (i >= 0) // && division == false)
+    {
+      // Gate *g = gates[i];
+      // if (g->get_elim())
+      //   continue;
+      Polynomial *pi = poly_set[i];
+      if (verbose >= 4)
+      {
+        fputs("[amulet2] reducing by ", stdout);
+        pi->print(stdout);
+      }
+      // const Polynomial *negfactor = divide_by_lm(rp, pi->get_mon(0));
+      const Polynomial *negfactor = divide_by_term(rp, pi->get_lt());
+      if (negfactor->is_constant_zero_poly())
+        i--;
+      else
+      {
+        Polynomial *mult = multiply_poly(negfactor, pi);
+        // Polynomial *tmp = add_poly(rp, mult);
+        rp = add_poly(rp, mult);
+        delete (mult);
+        division = true;
+        // rp = tmp;
+        if (verbose >= 4)
+        {
+          fprintf(stdout, "[amulet2] reduced polynomial is ");
+          rp->print(stdout);
+        }
+        // delete (tmp);
+        i--;
+      }
+      delete (negfactor);
+      // delete (pi);
+    }
+    // if (division == false)
+    // {
+    //   Monomial *lm_tmp = rp->get_mon(0);
+    //   push_mstack_end(lm_tmp);
+    //   Polynomial *lt_rp = build_poly();
+    //   mpz_t negCoeff;
+    //   mpz_init(negCoeff);
+    //   mpz_neg(negCoeff, lm_tmp->coeff);
+    //   Polynomial *neg_lt_rp = 0;
+    //   if (lt_rp->is_constant_one_poly())
+    //   {
+    //     push_mstack_end(new Monomial(minus_one, 0));
+    //     neg_lt_rp = build_poly();
+    //   }
+    //   else if (rp->size() == 1 && !lm_tmp->get_term())
+    //   {
+    //     push_mstack_end(new Monomial(negCoeff, 0));
+    //     neg_lt_rp = build_poly();
+    //   }
+    //   else
+    //   {
+    //     push_mstack_end(new Monomial(negCoeff, lm_tmp->get_term()->copy()));
+    //     neg_lt_rp = build_poly();
+    //   }
+
+    //   if (rem)
+    //   {
+    //     rem = add_poly(rem, lt_rp);
+    //   }
+    //   else
+    //   {
+    //     rem = lt_rp;
+    //   }
+    //   rp = add_poly(rp, neg_lt_rp);
+    //   mpz_clear(negCoeff);
+
+    //   // delete (lt_rp);
+    //   delete (neg_lt_rp);
+    //   // delete (lm_tmp);
+    // }
+
+    // }
+    rem = rp;
+    // delete (rp);
+
+    if (verbose >= 3)
+    {
+      if (rem && !rem->is_constant_zero_poly())
+      {
+        fprintf(stdout, "[amulet2] remainder is ");
+        rem->print(stdout);
+      }
+      else
+      {
+        fprintf(stdout, "[amulet2] remainder is 0;\n");
+      }
+    }
+    return rem;
+  }
+
+  Polynomial *construct_equiv_poly(unsigned i)
+  {
+    Gate *g = gates[i];
+    pair_equiv equiv_tag = get_equivClass[g->get_var_name()];
+    // std::cout << equiv_tag.first << "\n";
+    // std::cout << equiv_tag.second << "\n";
+    assert(equiv_tag.first != i);
+
+    Gate *gs = gates[equiv_tag.first];
+    // std::cout << "Should substitute " << g->get_var_name() << " to " << gs->get_var_name() << "\n";
+    if (equiv_tag.second == 1)
+    {
+      const Var *v1 = g->get_var();
+      Term *t1 = new_term(v1, 0);
+      Monomial *m1 = new Monomial(minus_one, t1);
+      push_mstack_end(m1);
+      const Var *v2 = gs->get_var();
+      Term *t2 = new_term(v2, 0);
+      Monomial *m2 = new Monomial(one, t2);
+      push_mstack_end(m2);
+    }
+    else
+    {
+      assert(equiv_tag.second == -1);
+      const Var *v1 = g->get_var();
+      Term *t1 = new_term(v1, 0);
+      Monomial *m1 = new Monomial(minus_one, t1);
+      push_mstack_end(m1);
+      const Var *v2 = gs->get_var();
+      Term *t2 = new_term(v2, 0);
+      Monomial *m2 = new Monomial(minus_one, t2);
+      push_mstack_end(m2);
+      Monomial *constant_one = new Monomial(one, 0);
+      push_mstack_end(constant_one);
+    }
+
+    Polynomial *p_equiv = build_poly();
+    return p_equiv;
+  }
+
+  Polynomial *reduce_with_valid(Polynomial *p, std::vector<Polynomial *> poly_set, mpz_t l, mpz_t u)
+  {
+    if (verbose >= 3)
+    {
+      fputs("[amulet2] polynomial is ", stdout);
+      p->print(stdout);
+    }
+
+    Polynomial *rem = 0;
+    Polynomial *rp = 0;
+    // Polynomial *tmp;
+
+    rp = p;
+    unsigned int poly_set_size = poly_set.size();
+
+    int check_num = 0;
+    int if_nosplit = 1;
+    if (global_split_num > 0)
+      if_nosplit = global_split_num;
+
+    std::vector<Polynomial *> equiv_poly = gen_equiv_poly_candidate(if_nosplit, window_depth, l, u);
+
+    // while (!rp->is_constant_zero_poly())
+    // {
+    // unsigned i = 0;
+    int i = poly_set_size - 1;
+    bool division = false;
+
+    while (i >= 0) // && division == false)
+    {
+      // Gate *g = gates[i];
+      // if (g->get_elim())
+      //   continue;
+      Polynomial *pi = poly_set[i];
+      if (verbose >= 4)
+      {
+        fputs("[amulet2] reducing by ", stdout);
+        pi->print(stdout);
+      }
+
+      std::string rewrite_name = pi->get_lt()->get_var_name();
+      unsigned current_num = gateMap[rewrite_name];
+      unsigned represent_gate_num = get_equivClass[rewrite_name].first;
+      int equiv_flag = get_equivClass[rewrite_name].second;
+
+      // if (current_num != represent_gate_num)
+      // {
+      //   // std::cout << rewrite_name << " is replaced by " << gates[represent_gate_num]->get_var_name() << "\n";
+
+      //   if (valid_equiv(gates[current_num], gates[represent_gate_num], window_depth, equiv_flag, l, u) == 1)
+      //   {
+      //     //     std::cout << "cannot prove" << rewrite_name << "is equivalent to " << gates[represent_gate_num]->get_var_name() << "\n";
+      //     //     pi->print(stdout);
+      //     //     std::cout << "return to \n";
+      //     //     Polynomial *original_poly = gates[current_num]->get_gate_constraint();
+      //     //     original_poly->print(stdout);
+      //     //     pi = original_poly;
+      //     //     poly_set[i] = original_poly;
+      //     //   }
+      //     // }
+      //     Polynomial *tmp_equiv_poly = construct_equiv_poly(current_num);
+      //     pi = reduce_by_equiv_poly(pi, tmp_equiv_poly);
+      //     poly_set[i] = pi;
+      //   }
+      // }
+
+      // const Polynomial *negfactor = divide_by_lm(rp, pi->get_mon(0));
+      const Polynomial *negfactor = divide_by_term(rp, pi->get_lt());
+      if (negfactor->is_constant_zero_poly())
+        i--;
+      else
+      {
+        Polynomial *mult = multiply_poly(negfactor, pi);
+        // Polynomial *tmp = add_poly(rp, mult);
+        rp = add_poly(rp, mult);
+        delete (mult);
+        // division = true;
+        // rp = tmp;
+        if (verbose >= 4)
+        {
+          fprintf(stdout, "[amulet2] reduced polynomial is ");
+          rp->print(stdout);
+        }
+        // delete (tmp);
+        i--;
+      }
+      delete (negfactor);
+
+      // delete (pi);
+    }
+    // if (division == false)
+    // {
+    //   Monomial *lm_tmp = rp->get_mon(0);
+    //   push_mstack_end(lm_tmp);
+    //   Polynomial *lt_rp = build_poly();
+    //   mpz_t negCoeff;
+    //   mpz_init(negCoeff);
+    //   mpz_neg(negCoeff, lm_tmp->coeff);
+    //   Polynomial *neg_lt_rp = 0;
+    //   if (lt_rp->is_constant_one_poly())
+    //   {
+    //     push_mstack_end(new Monomial(minus_one, 0));
+    //     neg_lt_rp = build_poly();
+    //   }
+    //   else if (rp->size() == 1 && !lm_tmp->get_term())
+    //   {
+    //     push_mstack_end(new Monomial(negCoeff, 0));
+    //     neg_lt_rp = build_poly();
+    //   }
+    //   else
+    //   {
+    //     push_mstack_end(new Monomial(negCoeff, lm_tmp->get_term()->copy()));
+    //     neg_lt_rp = build_poly();
+    //   }
+
+    //   if (rem)
+    //   {
+    //     rem = add_poly(rem, lt_rp);
+    //   }
+    //   else
+    //   {
+    //     rem = lt_rp;
+    //   }
+    //   rp = add_poly(rp, neg_lt_rp);
+    //   mpz_clear(negCoeff);
+
+    //   // delete (lt_rp);
+    //   delete (neg_lt_rp);
+    //   // delete (lm_tmp);
+    // }
+
+    // }
+    rem = rp;
+
+    // delete (rp);
 
     if (verbose >= 3)
     {

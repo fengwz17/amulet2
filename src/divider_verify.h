@@ -10,6 +10,8 @@
 extern bool gen_witness_divider;
 /*------------------------------------------------------------------------*/
 
+static std::map<std::string, unsigned int> gateMap;
+
 void dividerVerify(int split_num,
                    int window,
                    const char *inp_f = 0,
@@ -48,6 +50,10 @@ void fix_order();
 
 const std::vector<Polynomial *> gen_substitute_poly(int split_num, int window, mpz_t l, mpz_t m, std::map<std::string, int> fix_q_value);
 Polynomial *reduce_base(Polynomial *p, std::vector<Polynomial *> poly_set);
+Polynomial *reduce_base_back(Polynomial *p, std::vector<Polynomial *> poly_set);
+
+Polynomial *reduce_with_valid(Polynomial *p, std::vector<Polynomial *> poly_set, mpz_t l, mpz_t u);
+const std::vector<Polynomial *> gen_substitute_poly_candidate(int split_num, int window, mpz_t l, mpz_t m, std::map<std::string, int> fix_q_value);
 
 bool validate_rem(Polynomial *rem);
 
@@ -55,5 +61,8 @@ bool validate_rem(Polynomial *rem);
 void remove_internal_xor_gates_divider(FILE *file);
 
 bool same_poly(Polynomial *a, Polynomial *b);
+
+void construct_gate_map();
+const std::vector<Polynomial *> gen_original_poly();
 
 #endif // AMULET2_SRC_DIVIDER_VERIFY_H_
