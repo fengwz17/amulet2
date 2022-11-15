@@ -1,1 +1,5 @@
 build/
+.vscode
+examples/btor
+examples/others
+deps
